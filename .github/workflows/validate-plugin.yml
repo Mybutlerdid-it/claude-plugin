@@ -131,3 +131,38 @@ jobs:
             throw new Error('authorization server does not advertise PKCE S256');
           }
           NODE
+
+      - name: Smoke public reviewer pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /privacy /security /terms /connect/claude; do
+            output="$(curl --silent --show-error --location --max-time 30 \
+              --output /tmp/reviewer-page.html \
+              --write-out '%{http_code}|%{url_effective}|%{content_type}' \
+              "https://mybutlerdid.it${path}")"
+            IFS='|' read -r status effective content_type <<< "$output"
+
+            if [[ "$status" != '200' ]]; then
+              echo "Reviewer page ${path} returned ${status}" >&2
+              exit 1
+            fi
+            if [[ "$effective" != https://mybutlerdid.it/* && "$effective" != 'https://mybutlerdid.it/' ]]; then
+              echo "Reviewer page ${path} redirected off the canonical site: ${effective}" >&2
+              exit 1
+            fi
+            if [[ "$content_type" != text/html* ]]; then
+              echo "Reviewer page ${path} is not HTML: ${content_type}" >&2
+              exit 1
+            fi
+            bytes="$(wc -c < /tmp/reviewer-page.html)"
+            if (( bytes < 300 )); then
+              echo "Reviewer page ${path} is unexpectedly small: ${bytes} bytes" >&2
+              exit 1
+            fi
+          done
+
+          curl --silent --show-error --location 'https://mybutlerdid.it/privacy' | grep -qi 'privacy'
+          curl --silent --show-error --location 'https://mybutlerdid.it/security' | grep -Eqi 'security|data & safety'
+          curl --silent --show-error --location 'https://mybutlerdid.it/terms' | grep -qi 'terms'
+          curl --silent --show-error --location 'https://mybutlerdid.it/connect/claude' | grep -qi 'claude'
