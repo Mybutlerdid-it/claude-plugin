@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install current Claude CLI
         shell: bash
@@ -162,7 +162,12 @@ jobs:
             fi
           done
 
-          curl --silent --show-error --location 'https://mybutlerdid.it/privacy' | grep -qi 'privacy'
-          curl --silent --show-error --location 'https://mybutlerdid.it/security' | grep -Eqi 'security|data & safety'
-          curl --silent --show-error --location 'https://mybutlerdid.it/terms' | grep -qi 'terms'
-          curl --silent --show-error --location 'https://mybutlerdid.it/connect/claude' | grep -qi 'claude'
+          curl --silent --show-error --location --output /tmp/privacy.html 'https://mybutlerdid.it/privacy'
+          curl --silent --show-error --location --output /tmp/security.html 'https://mybutlerdid.it/security'
+          curl --silent --show-error --location --output /tmp/terms.html 'https://mybutlerdid.it/terms'
+          curl --silent --show-error --location --output /tmp/claude.html 'https://mybutlerdid.it/connect/claude'
+
+          grep -qi 'privacy' /tmp/privacy.html
+          grep -Eqi 'security|data & safety' /tmp/security.html
+          grep -qi 'terms' /tmp/terms.html
+          grep -qi 'claude' /tmp/claude.html
