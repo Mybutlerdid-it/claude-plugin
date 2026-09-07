@@ -1,0 +1,49 @@
+name: Validate Claude plugin
+
+on:
+  pull_request:
+    paths:
+      - '.claude-plugin/**'
+      - '.mcp.json'
+      - 'skills/**'
+      - '.github/workflows/validate-plugin.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.claude-plugin/**'
+      - '.mcp.json'
+      - 'skills/**'
+      - '.github/workflows/validate-plugin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install current Claude CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g --include=optional @anthropic-ai/claude-code@latest
+          claude --version
+
+      - name: Validate plugin manifest against Anthropic schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          claude plugin validate .claude-plugin/plugin.json
+
+      - name: Parse public MCP config
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('.mcp.json','utf8')); const s=p?.mcpServers?.mybutlerdidit; if(!s || s.type!=='http' || s.url!=='https://mybutlerdid.it/mcp?surface=claude-directory') process.exit(1);"
