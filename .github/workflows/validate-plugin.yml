@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install current Claude CLI
         shell: bash
@@ -131,3 +131,43 @@ jobs:
             throw new Error('authorization server does not advertise PKCE S256');
           }
           NODE
+
+      - name: Smoke public reviewer pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /privacy /security /terms /connect/claude; do
+            output="$(curl --silent --show-error --location --max-time 30 \
+              --output /tmp/reviewer-page.html \
+              --write-out '%{http_code}|%{url_effective}|%{content_type}' \
+              "https://mybutlerdid.it${path}")"
+            IFS='|' read -r status effective content_type <<< "$output"
+
+            if [[ "$status" != '200' ]]; then
+              echo "Reviewer page ${path} returned ${status}" >&2
+              exit 1
+            fi
+            if [[ "$effective" != https://mybutlerdid.it/* && "$effective" != 'https://mybutlerdid.it/' ]]; then
+              echo "Reviewer page ${path} redirected off the canonical site: ${effective}" >&2
+              exit 1
+            fi
+            if [[ "$content_type" != text/html* ]]; then
+              echo "Reviewer page ${path} is not HTML: ${content_type}" >&2
+              exit 1
+            fi
+            bytes="$(wc -c < /tmp/reviewer-page.html)"
+            if (( bytes < 300 )); then
+              echo "Reviewer page ${path} is unexpectedly small: ${bytes} bytes" >&2
+              exit 1
+            fi
+          done
+
+          curl --silent --show-error --location --output /tmp/privacy.html 'https://mybutlerdid.it/privacy'
+          curl --silent --show-error --location --output /tmp/security.html 'https://mybutlerdid.it/security'
+          curl --silent --show-error --location --output /tmp/terms.html 'https://mybutlerdid.it/terms'
+          curl --silent --show-error --location --output /tmp/claude.html 'https://mybutlerdid.it/connect/claude'
+
+          grep -qi 'privacy' /tmp/privacy.html
+          grep -Eqi 'security|data & safety' /tmp/security.html
+          grep -qi 'terms' /tmp/terms.html
+          grep -qi 'claude' /tmp/claude.html
