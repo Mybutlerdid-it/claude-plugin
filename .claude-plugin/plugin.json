@@ -1,0 +1,19 @@
+{
+  "name": "mybutlerdidit",
+  "displayName": "MyButlerDid.it",
+  "version": "0.2.0-directory.1",
+  "description": "Persistent memory, reminders and household context for Claude.",
+  "author": {
+    "name": "MyButlerDid.it"
+  },
+  "homepage": "https://mybutlerdid.it",
+  "repository": "https://github.com/Mybutlerdid-it/claude-plugin",
+  "keywords": [
+    "memory",
+    "household",
+    "personal-context",
+    "reminders",
+    "continuity",
+    "mcp"
+  ]
+}
