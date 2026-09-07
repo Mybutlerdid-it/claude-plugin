@@ -1,0 +1,73 @@
+name: Validate live Claude directory Origin policy
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/live-origin.yml'
+      - '.mcp.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-origin.yml'
+      - '.mcp.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  origin-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Claude directory Origin policy without affecting existing Claude beta
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"butler-origin-ci","version":"1.0"}}}'
+
+          directory_status="$(curl --silent --show-error \
+            --output /tmp/directory-origin-body \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --header 'accept: application/json, text/event-stream' \
+            --header 'origin: https://evil.example' \
+            --data "$payload" \
+            'https://mybutlerdid.it/mcp?surface=claude-directory')"
+
+          if [[ "$directory_status" != '403' ]]; then
+            echo "Expected untrusted Origin on Claude directory surface to return 403, got $directory_status" >&2
+            cat /tmp/directory-origin-body >&2 || true
+            exit 1
+          fi
+
+          beta_status="$(curl --silent --show-error \
+            --output /tmp/beta-origin-body \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --header 'accept: application/json, text/event-stream' \
+            --header 'origin: https://evil.example' \
+            --data "$payload" \
+            'https://mybutlerdid.it/mcp?surface=claude')"
+
+          if [[ "$beta_status" != '401' ]]; then
+            echo "Expected existing Claude beta surface to preserve its unauthenticated 401 behavior, got $beta_status" >&2
+            cat /tmp/beta-origin-body >&2 || true
+            exit 1
+          fi
+
+          directory_no_origin_status="$(curl --silent --show-error \
+            --output /tmp/directory-no-origin-body \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --header 'accept: application/json, text/event-stream' \
+            --data "$payload" \
+            'https://mybutlerdid.it/mcp?surface=claude-directory')"
+
+          if [[ "$directory_no_origin_status" != '401' ]]; then
+            echo "Expected server-to-server Claude directory request without Origin to reach OAuth and return 401, got $directory_no_origin_status" >&2
+            cat /tmp/directory-no-origin-body >&2 || true
+            exit 1
+          fi

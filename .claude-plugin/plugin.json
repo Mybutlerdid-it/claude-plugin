@@ -1,6 +1,6 @@
 {
   "name": "mybutlerdidit",
-  "version": "0.2.0-directory.1",
+  "version": "0.3.0-directory.1",
   "description": "Persistent memory, reminders and household context for Claude.",
   "author": {
     "name": "MyButlerDid.it"
