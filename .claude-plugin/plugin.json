@@ -1,6 +1,5 @@
 {
   "name": "mybutlerdidit",
-  "displayName": "MyButlerDid.it",
   "version": "0.2.0-directory.1",
   "description": "Persistent memory, reminders and household context for Claude.",
   "author": {
@@ -8,6 +7,7 @@
   },
   "homepage": "https://mybutlerdid.it",
   "repository": "https://github.com/Mybutlerdid-it/claude-plugin",
+  "license": "MIT",
   "keywords": [
     "memory",
     "household",
