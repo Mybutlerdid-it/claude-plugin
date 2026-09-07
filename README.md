@@ -16,9 +16,11 @@ This directory package intentionally does **not** expose advertising, sponsored 
 
 ## Connection
 
-The Claude directory connection file will be published here only after the dedicated production `claude-directory` route has been enabled and acceptance-tested.
+The public Claude directory connection points to Butler's production OAuth-protected remote MCP service:
 
-Users will authenticate with their Butler account through Butler's production OAuth-protected remote MCP service. No Butler password, API key or static connector secret will be placed in this package.
+`https://mybutlerdid.it/mcp?surface=claude-directory`
+
+The repository includes `.mcp.json` with this connection. Users authenticate with their Butler account; no Butler password, API key or static connector secret is placed in this package.
 
 The public wrapper repository is `https://github.com/Mybutlerdid-it/claude-plugin`, published by the `Mybutlerdid-it` GitHub organisation.
 
