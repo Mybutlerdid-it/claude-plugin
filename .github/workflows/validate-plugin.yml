@@ -47,3 +47,87 @@ jobs:
         run: |
           set -euo pipefail
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('.mcp.json','utf8')); const s=p?.mcpServers?.mybutlerdidit; if(!s || s.type!=='http' || s.url!=='https://mybutlerdid.it/mcp?surface=claude-directory') process.exit(1);"
+
+      - name: Smoke live OAuth-protected directory endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://mybutlerdid.it/mcp?surface=claude-directory'
+          payload='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"butler-directory-ci","version":"1.0"}}}'
+
+          status="$(curl --fail-with-body --silent --show-error \
+            --output /tmp/mcp-body \
+            --dump-header /tmp/mcp-headers \
+            --write-out '%{http_code}' \
+            --request POST \
+            --header 'content-type: application/json' \
+            --header 'accept: application/json, text/event-stream' \
+            --data "$payload" \
+            "$endpoint" || true)"
+
+          if [[ "$status" != '401' ]]; then
+            echo "Expected unauthenticated MCP request to return 401, got $status" >&2
+            cat /tmp/mcp-headers >&2 || true
+            cat /tmp/mcp-body >&2 || true
+            exit 1
+          fi
+
+          challenge="$(tr -d '\r' < /tmp/mcp-headers | awk 'BEGIN{IGNORECASE=1} /^www-authenticate:/{sub(/^[^:]+:[[:space:]]*/, ""); print; exit}')"
+          if [[ "$challenge" != Bearer* && "$challenge" != bearer* ]]; then
+            echo "Expected Bearer WWW-Authenticate challenge, got: $challenge" >&2
+            exit 1
+          fi
+
+          resource_metadata="$(printf '%s' "$challenge" | sed -n 's/.*resource_metadata="\([^"]*\)".*/\1/p')"
+          if [[ -z "$resource_metadata" ]]; then
+            echo "OAuth challenge did not advertise resource_metadata: $challenge" >&2
+            exit 1
+          fi
+
+          metadata_status="$(curl --silent --show-error --output /tmp/resource-metadata.json --write-out '%{http_code}' "$resource_metadata")"
+          if [[ "$metadata_status" != '200' ]]; then
+            echo "Protected-resource metadata returned $metadata_status from $resource_metadata" >&2
+            cat /tmp/resource-metadata.json >&2 || true
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('/tmp/resource-metadata.json', 'utf8'));
+          if (m.resource !== 'https://mybutlerdid.it/mcp') throw new Error(`unexpected resource: ${m.resource}`);
+          if (!Array.isArray(m.authorization_servers) || !m.authorization_servers.includes('https://mybutlerdid.it')) {
+            throw new Error(`unexpected authorization_servers: ${JSON.stringify(m.authorization_servers)}`);
+          }
+          if (!Array.isArray(m.scopes_supported) || !m.scopes_supported.includes('butler:access')) {
+            throw new Error(`missing butler:access scope: ${JSON.stringify(m.scopes_supported)}`);
+          }
+          NODE
+
+          auth_metadata='https://mybutlerdid.it/.well-known/oauth-authorization-server'
+          auth_status="$(curl --silent --show-error --output /tmp/auth-metadata.json --write-out '%{http_code}' "$auth_metadata")"
+          if [[ "$auth_status" != '200' ]]; then
+            echo "Authorization-server metadata returned $auth_status" >&2
+            cat /tmp/auth-metadata.json >&2 || true
+            exit 1
+          fi
+
+          node <<'NODE'
+          const fs = require('fs');
+          const m = JSON.parse(fs.readFileSync('/tmp/auth-metadata.json', 'utf8'));
+          const expected = {
+            authorization_endpoint: 'https://mybutlerdid.it/authorize',
+            token_endpoint: 'https://mybutlerdid.it/oauth/token',
+            registration_endpoint: 'https://mybutlerdid.it/oauth/register'
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (m[key] !== value) throw new Error(`${key} mismatch: ${m[key]}`);
+          }
+          for (const scope of ['butler:access', 'offline_access']) {
+            if (!Array.isArray(m.scopes_supported) || !m.scopes_supported.includes(scope)) {
+              throw new Error(`missing authorization scope ${scope}`);
+            }
+          }
+          if (!Array.isArray(m.code_challenge_methods_supported) || !m.code_challenge_methods_supported.includes('S256')) {
+            throw new Error('authorization server does not advertise PKCE S256');
+          }
+          NODE
