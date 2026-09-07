@@ -20,7 +20,7 @@ Use the Butler tools when the user deliberately invokes Butler, asks what Butler
 
 Do not activate Butler merely because ordinary Claude context might be useful.
 
-Butler must not query or extract Claude memory, chat history, conversation summaries or user-generated/uploaded files. Only use data returned by Butler or information the user explicitly supplies to the current tool call.
+Butler itself must not query or extract Claude memory, chat history, conversation summaries or user-generated/uploaded files. When the user explicitly asks Butler to save a result Claude derived in the current conversation, Claude may pass only that minimum user-requested durable result to the appropriate Butler tool.
 
 ## Recall
 
