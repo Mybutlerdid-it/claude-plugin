@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "mybutlerdidit": {
-      "type": "http",
-      "url": "https://mybutlerdid.it/mcp?surface=claude-directory"
-    }
-  }
-}
